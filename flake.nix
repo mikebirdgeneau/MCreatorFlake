@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     mcreator-releases = {
-      url = "file+https://api.github.com/repos/MCreator/MCreator/releases";
+      url = "file+https://api.github.com/repos/MCreator/MCreator/releases?per_page=100";
       flake = false;
     };
   };
@@ -17,7 +17,6 @@
     in with builtins;
     with pkgs.lib;
     let
-      baseVersions = [ "forge" "datapack" "bedrock" ];
       includePrereleases = false;
 
       asJsonWithPrereleases = fromJSON (readFile mcreator-releases);
@@ -25,28 +24,36 @@
         asJsonWithPrereleases
       else
         filter (release: !release.prerelease) asJsonWithPrereleases;
-      regExpr =
-        ".*?Minecraft Forge ([[:digit:].x/]*), Data Packs ([[:digit:].x/]*), and Bedrock Edition ([[:digit:].x/]*).*?$";
-      versionsFromBody = match regExpr;
-      toSupportedVersion = mcversions:
-        listToAttrs (lists.zipListsWith (base: mcversion: {
-          name = base;
-          value = mcversion;
-        }) baseVersions mcversions);
-      splitAndSwapDot = xs:
-        map
-        (s: map (replaceStrings [ "." ] [ "_" ]) (strings.splitString "/" s))
-        xs;
-      formattedJson = map (attr: {
+
+      versionsFromBody = body:
+        let
+          outerRegExpr = ".*<!--\\[\\[(.*)\]\]-->";
+          matched = match outerRegExpr body;
+          minecraftString = (fromJSON (head (throwIf (isNull matched) "" matched))).minecraft;
+          innerRegExpr = "([[:alpha:] ]*) ([[:digit:].x/]+)";
+          nameVersios = filter  (obj: isString obj && stringLength obj > 0) (split ", |and " minecraftString);
+
+          splitAndSwapDot = (s: map (replaceStrings [ "." ] [ "_" ]) (strings.splitString "/" s));
+          lowerAndSwapSpace = s: replaceStrings [ " " ] [ "_" ] (toLower s);
+          toAttrs = listTuple:
+            { "${lowerAndSwapSpace (head listTuple)}" = splitAndSwapDot (head (tail listTuple)); };
+        in
+          mergeAttrsList (map (s: toAttrs (match innerRegExpr s)) nameVersios);
+
+      baseVersions = lists.unique (concatMap (mcversion: attrNames mcversion.support) formattedJson);
+
+      formattedJson = filter (v: !(isNull v)) (map (attr: let
+        result = tryEval (versionsFromBody attr.body);
+      in if !result.success then null else {
         mcversion = attr.name;
-        support =
-          toSupportedVersion (splitAndSwapDot (versionsFromBody attr.body));
-      }) asJson;
+        support = result.value;
+      }) asJson);
+
       allVersionsFromBase = base:
-        lists.unique (lists.flatten
-          (map (mcversion: mcversion.support.${base}) formattedJson));
+        filter (v: v != null) (lists.unique (lists.flatten
+          (map (mcversion: mcversion.support.${base} or null) formattedJson)));
       mcvsSupporting = base: version:
-        (filter (mcversion: elem version mcversion.support.${base})
+        (filter (mcversion: elem version (mcversion.support.${base} or []))
           formattedJson);
       maxVersion = foldl' (mcvA: mcvB:
         if (compareVersions mcvA.mcversion mcvB.mcversion) == 1 then
@@ -60,11 +67,14 @@
 
       mcreatorFromVersion = (fullVersion:
         let
-          jdk = pkgs.jdk17;
-
-          version = builtins.concatStringsSep "."
-            (pkgs.lib.lists.take 2 (builtins.splitVersion fullVersion));
+          yearMonthVersion = (pkgs.lib.lists.take 2 (builtins.splitVersion fullVersion));
+          yearVersionInt = toInt (head yearMonthVersion);
+          version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
+
+          jdk = if yearVersionInt > 2020 
+            then (pkgs.jdk.override { enableJavaFX = true; })
+            else pkgs.jdk17;
 
           src = fetchTarball
             "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
@@ -107,13 +117,23 @@
           '';
         }));
 
+
+      allVersions = lists.unique (map (mcversion: mcversion.mcversion) formattedJson);
+      majorVersions = groupBy (substring 0 6) allVersions;
+      mcreatorPackagesByMajorVersion = mapAttrs' (
+        major: minors: let
+          maxVersion = foldl' (mcvA: mcvB:
+            if (compareVersions mcvA mcvB) == 1 then mcvA else mcvB) "0";
+          pkg = mcreatorFromVersion (maxVersion minors);
+        in nameValuePair pkg.name pkg
+      ) majorVersions;
       mcreatorPackages = attrsets.mergeAttrsList (flatten (map (base:
         map (version: {
           ${base + version} =
             mcreatorFromVersion (mostUptoDateFor base version).mcversion;
         }) (allVersionsFromBase base)) baseVersions)) // {
           default = mcreatorFromVersion mostUptoDateForgeAny;
-        };
+        } // mcreatorPackagesByMajorVersion;
 
       mcreaotrApps = attrsets.mapAttrs (pkgs: drv: {
         type = "app";
@@ -121,8 +141,8 @@
       }) mcreatorPackages;
 
     in {
+      inherit mcreatorPackagesByMajorVersion;
       packages.x86_64-linux = mcreatorPackages;
       apps.x86_64-linux = mcreaotrApps;
     };
-
 }
