@@ -87,7 +87,8 @@
           version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
 
-          jdk = pkgs.javaPackages.compiler.openjdk21.override { enableJavaFX = true; };
+          openjfx = pkgs.openjfx21.override { withWebKit = true; };
+          jdk = pkgs.javaPackages.compiler.openjdk21.override { openjfx21 = openjfx; enableJavaFX = true; };
 
           src = fetchTarball {
             url = "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
@@ -143,7 +144,7 @@
             CLASSPATH=\"${src}/lib/mcreator.jar:${src}/lib/*\" \
             ${jdk}/bin/java \
             --add-opens=java.base/java.lang=ALL-UNNAMED \
-            -Djava.library.path=${jdk}/lib/openjfx \
+            -Djava.library.path=${openjfx}/lib \
             net.mcreator.Launcher"
           '';
         })
