@@ -1,5 +1,3 @@
-{
-  description = "Minecraft Mod Maker";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -89,8 +87,7 @@
           version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
 
-          jdk = pkgs.javaPackages.compiler.openjdk21;
-          openjfx = pkgs.javaPackages.openjfx21;
+          jdk = pkgs.javaPackages.compiler.openjdk21.override { enableJavaFX = true; };
 
           src = fetchTarball {
             url = "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
@@ -120,7 +117,6 @@
             pkgs:
             [
               jdk
-              openjfx
               pkgs.freetype
               pkgs.zlib
               pkgs.libGL
@@ -147,9 +143,7 @@
             CLASSPATH=\"${src}/lib/mcreator.jar:${src}/lib/*\" \
             ${jdk}/bin/java \
             --add-opens=java.base/java.lang=ALL-UNNAMED \
-            -Djava.library.path=${openjfx}/lib \
-            --module-path=${openjfx}/lib \
-            --add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing \
+            -Djava.library.path=${jdk}/lib/openjfx \
             net.mcreator.Launcher"
           '';
         })
