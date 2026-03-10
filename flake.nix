@@ -89,7 +89,7 @@
           version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
 
-          jdk = pkgs.javaPackages.compiler.openjdk17.override { enableJavaFX = true; };
+          jdk = pkgs.javaPackages.compiler.openjdk21.override { enableJavaFX = true; };
 
           src = fetchTarball {
             url = "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
@@ -119,7 +119,7 @@
             pkgs:
             [
               jdk
-              pkgs.javaPackages.openjfx17
+              pkgs.javaPackages.openjfx21
               pkgs.freetype
               pkgs.zlib
               pkgs.libGL
@@ -129,16 +129,14 @@
               pkgs.pango
               pkgs.atk
               pkgs.gdk-pixbuf
-            ]
-            ++ (with pkgs.xorg; [
-              libX11
-              libXrandr
-              libXtst
-              libXrender
-              libXxf86vm
-              libXext
-              libXi
-            ]);
+              pkgs.libxi
+              pkgs.libx11
+              pkgs.libxrandr
+              pkgs.libxtst
+              pkgs.libxrender
+              pkgs.libxxf86vm
+              pkgs.libxext
+            ];
 
           extraInstallCommands = installPhase;
 
