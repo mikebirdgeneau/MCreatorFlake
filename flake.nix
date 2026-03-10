@@ -89,9 +89,12 @@
           version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
 
-          jdk = if yearVersionInt > 2020 then (pkgs.jdk17.override { enableJavaFX = true; }) else pkgs.jdk17;
+          jdk = pkgs.javaPackages.compiler.openjdk17.override { enableJavaFX = true; };
 
-          src = fetchTarball "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
+          src = fetchTarball {
+            url = "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
+            sha256 = pkgs.lib.fakeHash;
+          };
 
           installPhase = ''
             mkdir -p "$out/share/applications"
@@ -115,7 +118,8 @@
           targetPkgs =
             pkgs:
             [
-              jdk17
+              jdk
+              pkgs.javaPackages.openjfx17
               pkgs.freetype
               pkgs.zlib
               pkgs.libGL
