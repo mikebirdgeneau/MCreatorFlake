@@ -89,7 +89,8 @@
           version = builtins.concatStringsSep "." yearMonthVersion;
           versionDash = replaceStrings [ "." ] [ "-" ] version;
 
-          jdk = pkgs.javaPackages.compiler.openjdk21.override { enableJavaFX = true; };
+          jdk = pkgs.javaPackages.compiler.openjdk21;
+          openjfx = pkgs.javaPackages.openjfx21;
 
           src = fetchTarball {
             url = "https://github.com/MCreator/MCreator/releases/download/${fullVersion}/MCreator.${version}.Linux.64bit.tar.gz";
@@ -119,7 +120,7 @@
             pkgs:
             [
               jdk
-              pkgs.javaPackages.openjfx21
+              openjfx
               pkgs.freetype
               pkgs.zlib
               pkgs.libGL
@@ -136,6 +137,7 @@
               pkgs.libxrender
               pkgs.libxxf86vm
               pkgs.libxext
+              pkgs.webkitgtk_4_1
             ];
 
           extraInstallCommands = installPhase;
@@ -143,7 +145,12 @@
           runScript = ''
             bash -c "cd ${src} && \
             CLASSPATH=\"${src}/lib/mcreator.jar:${src}/lib/*\" \
-            ${jdk}/bin/java --add-opens=java.base/java.lang=ALL-UNNAMED net.mcreator.Launcher"
+            ${jdk}/bin/java \
+            --add-opens=java.base/java.lang=ALL-UNNAMED \
+            -Djava.library.path=${openjfx}/lib \
+            --module-path=${openjfx}/lib \
+            --add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing \
+            net.mcreator.Launcher"
           '';
         })
       );
