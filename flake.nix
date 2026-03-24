@@ -32,9 +32,9 @@
       versionsFromBody =
         body:
         let
-          outerRegExpr = ".*<!--\\[\\[(.*)\\]\\]-->";
+          outerRegExpr = ".*<!--[[][[](.*)[]][]]-->.*";
           matched = match outerRegExpr body;
-          minecraftString = (fromJSON (head (throwIf (isNull matched) "" matched))).minecraft;
+          minecraftString = (fromJSON (head (throwIf (isNull matched) "Could not parse MCreator release body" matched))).minecraft;
           innerRegExpr = "([[:alpha:] ]*) ([[:digit:].x/]+)";
           nameVersios = filter (obj: isString obj && stringLength obj > 0) (split ", |and " minecraftString);
 
